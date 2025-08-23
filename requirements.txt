@@ -1,0 +1,9 @@
+fastapi
+pymongo
+python-dotenv
+python-doctr
+langchain
+pymupdf
+img2pdf
+google-genai
+uvicorn
