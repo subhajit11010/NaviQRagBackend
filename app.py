@@ -31,7 +31,7 @@ app.add_middleware(
 )
 load_dotenv()
 
-client = MongoClient("mongodb+srv://subhajitchakraborty509867:u2all8N9bIxxXAHo@cluster0.iupkgc9.mongodb.net/")
+client = MongoClient(os.getenv("MONGO_URI"))
 db = client["NaviQ"]
 collection: Collection = db["rag_db"]
 collection.create_index([("organization_id", ASCENDING)])
