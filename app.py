@@ -1,5 +1,6 @@
 # from annotated_types import doc
-from fastapi import FastAPI, UploadFile, File, Query, Form
+from flask import Flask, request, jsonify
+from flask_cors import CORS
 from pymongo import MongoClient
 from pymongo.collection import Collection
 from pymongo import ASCENDING
@@ -21,15 +22,12 @@ from doctr.models import ocr_predictor
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.docstore.document import Document
 
-ocr_model = ocr_predictor(pretrained=True)
-
-app = FastAPI()
-origins = ["*"]
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-)
 load_dotenv()
+
+app = Flask(__name__)
+CORS(app) 
+ocr_model = ocr_predictor(pretrained=True)
+print("model downloaded")
 
 client = MongoClient(os.getenv("MONGO_URI"))
 db = client["NaviQ"]
@@ -88,9 +86,15 @@ def extract_text_from_doctr(result):
     return text
 
 
-@app.post("/upload")
-async def upload_file(organization_id: str = Form(...), file: UploadFile = File(...)):
-    contents = await file.read()
+@app.route("/upload", methods=["POST"])
+def upload_file():
+    organization_id = request.form.get("organization_id")
+    file = request.files.get("file")
+
+    if not file or not organization_id:
+        return jsonify({"error": "Missing file or organization_id"}), 400
+    
+    contents = file.read()
     doc = fitz.open(stream=contents, filetype="pdf")
     print(doc)
     text = ""
@@ -153,8 +157,11 @@ async def upload_file(organization_id: str = Form(...), file: UploadFile = File(
         pass
     return {"message": "File uploaded successfully"}
 
-@app.get("/query")
-async def query(organization_id: str = Query(...), question: str = Query(...)):
+@app.route("/query", methods=["GET"])
+def query():
+    organization_id = request.args.get("organization_id")
+    question = request.args.get("question")
+
     context_docs = get_query_results(organization_id, question)
     context_string = " ".join([doc["text"] for doc in context_docs])
     prompt = f"""Use the following pieces of context to answer the question at the end.
@@ -163,3 +170,6 @@ async def query(organization_id: str = Query(...), question: str = Query(...)):
     """
     response = genai_client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
     return response.text
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=7860)
